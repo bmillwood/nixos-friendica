@@ -10,3 +10,7 @@ diversity of configurations. Suggestions welcome.
 
 The current available configuration is using Apache and `mod_php`. I plan to
 offer at least a `php-fpm`-based configuration, and probably an nginx one.
+
+## License
+
+I'll pick one shortly. I realise the code is close to useless until I do.
