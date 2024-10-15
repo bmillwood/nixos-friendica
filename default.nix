@@ -208,6 +208,7 @@ in
     systemd.timers."friendica-worker" = {
       wantedBy = [ "timers.target" ];
       timerConfig = {
+        OnActiveSec = "0";
         OnUnitActiveSec = "600";
         Unit = "friendica-worker.service";
       };
