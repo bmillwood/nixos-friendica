@@ -3,7 +3,7 @@ let
   cfg = config.services.friendica;
   inherit (lib) mkIf mkMerge mkOption types;
   inherit (pkgs) stdenvNoCC;
-  basePHP = pkgs.php.buildEnv {
+  php = pkgs.php.buildEnv {
     extensions = ({ enabled, all }: with all; enabled ++ [
       curl gd gmp pdo mbstring intl mysqli zip openssl imagick
       # friendica docs also ask for hash, but:
@@ -24,28 +24,6 @@ let
       "display_errors = Off;"
     ];
   };
-  php =
-    if cfg.useFPM
-    then basePHP
-    else basePHP.override {
-      # without doing this override we see:
-      # Failed loading /nix/store/...-php-opcache-8.2.24/lib/php/extensions/opcache.so:  /nix/store/...-php-opcache-8.2.24/lib/php/extensions/opcache.so: undefined symbol: zend_signal_globals_offset
-      # zend_signal_globals_offset is defined conditionally in PHP based on
-      # whether you enabled ZTS:
-      # https://github.com/php/php-src/blob/57bfca9045a8b548d322635ddb4d0c7a24735b0d/Zend/zend_signal.c#L47
-      # which defaults to apxs2Support in the PHP nix package:
-      # https://github.com/NixOS/nixpkgs/blob/d51c28603def282a24fa034bcb007e2bcb5b5dd0/pkgs/development/interpreters/php/generic.nix#L62C9-L62C10
-      # we also see that these two overrides are done to your PHP package by the
-      # apache httpd nixos module:
-      # https://github.com/NixOS/nixpkgs/blob/d51c28603def282a24fa034bcb007e2bcb5b5dd0/nixos/modules/services/web-servers/apache-httpd/default.nix#L21
-      # so my guess is that the error is from some mismatch between a non-threaded
-      # command line PHP and a threaded apache PHP.
-      # with the overrides, we still get this spam in apache error.log:
-      # Cannot load Zend OPcache - it was already loaded
-      # but that seems less likely to be harmful
-      apxs2Support = true;
-      apacheHttpd = config.services.httpd.package;
-    };
   version = "2024.08";
   addons = pkgs.fetchFromGitHub {
     owner = "friendica";
@@ -155,15 +133,10 @@ in
         default = [];
         description = "Addons that will be in the state directory.";
       };
-      useFPM = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Use phpfpm to run PHP, instead of mod_php.";
-      };
     };
   };
   config = mkIf cfg.enable (mkMerge [
-    (mkIf cfg.useFPM {
+    {
       services.phpfpm.pools.friendica = {
         user = cfg.user;
         group = cfg.group;
@@ -184,8 +157,13 @@ in
         phpPackage = php;
       };
       services.httpd = {
+        enable = true;
         extraModules = [ "proxy" "proxy_fcgi" ];
         virtualHosts.${cfg.virtualHost} = {
+          forceSSL = true;
+          enableACME = false;
+          sslServerCert = "${cfg.sslDir}/${cfg.virtualHost}.crt";
+          sslServerKey = "${cfg.sslDir}/${cfg.virtualHost}.key";
           documentRoot = friendicaRoot;
           # adapted from friendica .htaccess-dist
           extraConfig = ''
@@ -196,29 +174,6 @@ in
           '';
         };
       };
-    })
-    (mkIf (!cfg.useFPM) {
-      services.httpd = {
-        enablePHP = true;
-        phpPackage = php;
-        virtualHosts.${cfg.virtualHost} = {
-          documentRoot = friendicaRoot;
-          extraConfig = ''
-            <Directory "${friendicaRoot}">
-              Options FollowSymlinks
-              AllowOverride All
-            </Directory>
-          '';
-          locations."/" = {
-            index = "index.php";
-          };
-        };
-        # when we're running the PHP as the webserver, need the webserver to
-        # have the right user for MySQL auth
-        user = cfg.user;
-      };
-    })
-    {
       users.users.${cfg.user} = {
         isSystemUser = true;
         createHome = true;
@@ -228,15 +183,6 @@ in
         useDefaultShell = true;
       };
       users.groups.${cfg.group} = {};
-      services.httpd = {
-        enable = true;
-        virtualHosts.${cfg.virtualHost} = {
-          forceSSL = true;
-          enableACME = false;
-          sslServerCert = "${cfg.sslDir}/${cfg.virtualHost}.crt";
-          sslServerKey = "${cfg.sslDir}/${cfg.virtualHost}.key";
-        };
-      };
       systemd.services."friendica-setup" = {
         # friendica uses shell_exec('which ' . $phppath)
         path = [ pkgs.bash php pkgs.which ];
