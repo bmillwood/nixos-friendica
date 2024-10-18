@@ -158,6 +158,7 @@ in
       useFPM = mkOption {
         type = types.bool;
         default = true;
+        description = "Use phpfpm to run PHP, instead of mod_php.";
       };
     };
   };
