@@ -95,10 +95,18 @@ let
       -o -path ./.htaccess-dist -exec cp {} $out/.htaccess \; \
       -o -type d -exec mkdir $out/{} \; \
       -o -type f -exec cp --reflink=auto {} $out/{} \;
+    popd
     cp $configFile $out/config/local.config.php
     ln -s ${cfg.stateDir}/log $out/log
-    ln -s $addons $out/addon
-    popd
+    mkdir $out/addon
+    for a in $addons/*
+    do
+      ln -s "$a" $out/addon/$(basename "$a")
+    done
+    for a in ${lib.strings.concatStringsSep " " cfg.addonsFromStateDir}
+    do
+      ln -s ${cfg.stateDir}/addon/"$a" $out/addon/"$a"
+    done
   '';
 in
 {
@@ -139,6 +147,11 @@ in
         type = types.str;
         default = "/var/lib/friendica";
         description = "Directory where friendica will store file state. Created if it doesn't exist.";
+      };
+      addonsFromStateDir = mkOption {
+        type = types.listOf types.str;
+        default = [];
+        description = "Addons that will be in the state directory.";
       };
     };
   };
