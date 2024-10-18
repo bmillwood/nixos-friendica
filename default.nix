@@ -128,9 +128,7 @@ in
       };
       group = mkOption {
         type = types.str;
-        # This is because this group has read access to the SSL certs on my
-        # system. I'm not sure if it makes sense in general.
-        default = "wwwrun";
+        default = "friendica";
         description = "Set as the group of $user (e.g. so it can read SSL certs)";
       };
       adminEmail = mkOption {
@@ -220,6 +218,7 @@ in
         # not sure if this matters
         useDefaultShell = true;
       };
+      users.groups.${cfg.group} = {};
       services.httpd = {
         enable = true;
         virtualHosts.${cfg.virtualHost} = {
