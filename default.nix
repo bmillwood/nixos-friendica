@@ -164,15 +164,7 @@ in
       # not sure if this matters
       useDefaultShell = true;
     };
-    services.httpd =
-      let
-        # this is here to allow easy switching between "have the document root
-        # in the nix store" and "have the document root in the home directory,
-        # but copy it in from the nix store", where the latter is useful when I
-        # want to make changes to the friendica code, usually for debugging
-        # reasons
-        documentRoot = friendicaRoot;
-      in {
+    services.httpd = {
       enable = true;
       enablePHP = true;
       phpPackage = php;
@@ -181,9 +173,9 @@ in
         enableACME = false;
         sslServerCert = "${cfg.sslDir}/${cfg.virtualHost}.crt";
         sslServerKey = "${cfg.sslDir}/${cfg.virtualHost}.key";
-        inherit documentRoot;
+        documentRoot = friendicaRoot;
         extraConfig = ''
-          <Directory "${documentRoot}">
+          <Directory "${friendicaRoot}">
             Options FollowSymlinks
             AllowOverride All
           </Directory>
@@ -213,8 +205,6 @@ in
       serviceConfig = {
         Type = "oneshot";
         User = cfg.user;
-        # this should probably be documentRoot instead, but that's not currently
-        # available at this scope
         WorkingDirectory = "${friendicaRoot}";
       };
     };
