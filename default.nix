@@ -206,6 +206,9 @@ in
             index = "index.php";
           };
         };
+        # when we're running the PHP as the webserver, need the webserver to
+        # have the right user for MySQL auth
+        user = cfg.user;
       };
     })
     {
@@ -225,12 +228,11 @@ in
           sslServerCert = "${cfg.sslDir}/${cfg.virtualHost}.crt";
           sslServerKey = "${cfg.sslDir}/${cfg.virtualHost}.key";
         };
-        user = cfg.user; # mysql needs this to match the db user
       };
-      systemd.services.httpd = {
+      systemd.services."friendica-setup" = {
         # friendica uses shell_exec('which ' . $phppath)
         path = [ pkgs.bash php pkgs.which ];
-        preStart = ''
+        script = ''
           [ -d ~/log ] || mkdir -p ~/log
           [ -d ~/view/smarty3 ] || mkdir -p ~/view/smarty3
           if [ -z "$(echo "SHOW TABLES" | ${config.services.mysql.package}/bin/mysql friendica)" ]
@@ -239,6 +241,11 @@ in
             bash bin/console dbstructure update
           fi
         '';
+        serviceConfig = {
+          Type = "oneshot";
+          User = cfg.user;
+        };
+        wantedBy = [ "httpd.service" ];
       };
       systemd.services."friendica-worker" = {
         path = [ php ];
