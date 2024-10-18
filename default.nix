@@ -163,7 +163,7 @@ in
         user = cfg.user;
         group = cfg.group;
         settings = {
-          "listen" = "127.0.0.1:9000";
+          "listen.owner" = config.services.httpd.user;
           "pm" = "static";
           "pm.max_children" = 32;
           # copied from https://wiki.nixos.org/wiki/Phpfpm
@@ -183,7 +183,7 @@ in
             RewriteEngine on
             RewriteRule "(^|/)\.git" - [F]
             RewriteCond ${friendicaRoot}/%{REQUEST_URI} !-f
-            RewriteRule "^(.*)$" fcgi://127.0.0.1:9000${friendicaRoot}/index.php?pagename=$1 [E=REMOTE_USER:%{HTTP:Authorization},L,QSA,B,P]
+            RewriteRule "^(.*)$" unix:${config.services.phpfpm.pools.friendica.socket}|fcgi://127.0.0.1:9000${friendicaRoot}/index.php?pagename=$1 [E=REMOTE_USER:%{HTTP:Authorization},L,QSA,B,P]
           '';
         };
       };
