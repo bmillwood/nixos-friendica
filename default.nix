@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.services.friendica;
-  inherit (lib) mkIf mkOption types;
+  inherit (lib) mkIf mkMerge mkOption types;
   inherit (pkgs) stdenvNoCC;
   php = (pkgs.php.buildEnv {
     extensions = ({ enabled, all }: with all; enabled ++ [
@@ -153,90 +153,132 @@ in
         default = [];
         description = "Addons that will be in the state directory.";
       };
+      useFPM = mkOption {
+        type = types.bool;
+        default = true;
+      };
     };
   };
-  config = mkIf cfg.enable {
-    users.users.${cfg.user} = {
-      isSystemUser = true;
-      createHome = true;
-      home = cfg.stateDir;
-      group = cfg.group;
-      # not sure if this matters
-      useDefaultShell = true;
-    };
-    services.httpd = {
-      enable = true;
-      enablePHP = true;
-      phpPackage = php;
-      virtualHosts.${cfg.virtualHost} = {
-        forceSSL = true;
-        enableACME = false;
-        sslServerCert = "${cfg.sslDir}/${cfg.virtualHost}.crt";
-        sslServerKey = "${cfg.sslDir}/${cfg.virtualHost}.key";
-        documentRoot = friendicaRoot;
-        extraConfig = ''
-          <Directory "${friendicaRoot}">
-            Options FollowSymlinks
-            AllowOverride All
-          </Directory>
-        '';
-        locations."/" = {
-          index = "index.php";
+  config = mkIf cfg.enable (mkMerge [
+    (mkIf cfg.useFPM {
+      services.phpfpm.pools.friendica = {
+        user = cfg.user;
+        group = cfg.group;
+        settings = {
+          "listen" = "127.0.0.1:9000";
+          "pm" = "static";
+          "pm.max_children" = 32;
+          # copied from https://wiki.nixos.org/wiki/Phpfpm
+          "php_admin_value[error_log]" = "stderr";
+          "php_admin_flag[log_errors]" = true;
+          "catch_workers_output" = true;
+        };
+        phpEnv.PATH = lib.makeBinPath [ php pkgs.bash pkgs.which ];
+        phpPackage = php;
+      };
+      services.httpd = {
+        extraModules = [ "proxy" "proxy_fcgi" ];
+        virtualHosts.${cfg.virtualHost} = {
+          documentRoot = friendicaRoot;
+          # adapted from friendica .htaccess-dist
+          extraConfig = ''
+            RewriteEngine on
+            RewriteRule "(^|/)\.git" - [F]
+            RewriteCond ${friendicaRoot}/%{REQUEST_URI} !-f
+            RewriteRule "^(.*)$" fcgi://127.0.0.1:9000${friendicaRoot}/index.php?pagename=$1 [E=REMOTE_USER:%{HTTP:Authorization},L,QSA,B,P]
+          '';
         };
       };
-      user = cfg.user; # mysql needs this to match the db user
-    };
-    systemd.services.httpd = {
-      # friendica uses shell_exec('which ' . $phppath)
-      path = [ pkgs.bash php pkgs.which ];
-      preStart = ''
-        [ -d ~/log ] || mkdir -p ~/log
-        [ -d ~/view/smarty3 ] || mkdir -p ~/view/smarty3
-        if [ -z "$(echo "SHOW TABLES" | ${config.services.mysql.package}/bin/mysql friendica)" ]
-        then
-          cd ${friendicaRoot}
-          bash bin/console dbstructure update
-        fi
-      '';
-    };
-    systemd.services."friendica-worker" = {
-      path = [ php ];
-      script = "php bin/worker.php";
-      serviceConfig = {
-        Type = "oneshot";
-        User = cfg.user;
-        WorkingDirectory = "${friendicaRoot}";
-      };
-    };
-    systemd.timers."friendica-worker" = {
-      wantedBy = [ "timers.target" ];
-      timerConfig = {
-        OnActiveSec = "0";
-        OnUnitActiveSec = "600";
-        Unit = "friendica-worker.service";
-      };
-    };
-    services.mysql = {
-      enable = true;
-      package = pkgs.mariadb;
-      ensureDatabases = [ "friendica" ];
-      ensureUsers = [
-        {
-          name = cfg.user;
-          ensurePermissions = {
-            "friendica.*" = "ALL PRIVILEGES";
+    })
+    (mkIf (!cfg.useFPM) {
+      services.httpd = {
+        enablePHP = true;
+        phpPackage = php;
+        virtualHosts.${cfg.virtualHost} = {
+          documentRoot = friendicaRoot;
+          extraConfig = ''
+            <Directory "${friendicaRoot}">
+              Options FollowSymlinks
+              AllowOverride All
+            </Directory>
+          '';
+          locations."/" = {
+            index = "index.php";
           };
-        }
-      ];
-    };
-    warnings =
-      if config ? services.mail.sendmailSetuidWrapper.source
-      then []
-      else [ ''
-          Friendica tries to send mail with sendmail. User registration will be
-          pretty janky if you don't have one. I don't see a value for
-          services.mail.sendmailSetuidWrapper.source, which I think sendmail
-          providers usually set, but I'm not certain this is a reliable test.
-        '' ];
-  };
+        };
+      };
+    })
+    {
+      users.users.${cfg.user} = {
+        isSystemUser = true;
+        createHome = true;
+        home = cfg.stateDir;
+        group = cfg.group;
+        # not sure if this matters
+        useDefaultShell = true;
+      };
+      services.httpd = {
+        enable = true;
+        virtualHosts.${cfg.virtualHost} = {
+          forceSSL = true;
+          enableACME = false;
+          sslServerCert = "${cfg.sslDir}/${cfg.virtualHost}.crt";
+          sslServerKey = "${cfg.sslDir}/${cfg.virtualHost}.key";
+        };
+        user = cfg.user; # mysql needs this to match the db user
+      };
+      systemd.services.httpd = {
+        # friendica uses shell_exec('which ' . $phppath)
+        path = [ pkgs.bash php pkgs.which ];
+        preStart = ''
+          [ -d ~/log ] || mkdir -p ~/log
+          [ -d ~/view/smarty3 ] || mkdir -p ~/view/smarty3
+          if [ -z "$(echo "SHOW TABLES" | ${config.services.mysql.package}/bin/mysql friendica)" ]
+          then
+            cd ${friendicaRoot}
+            bash bin/console dbstructure update
+          fi
+        '';
+      };
+      systemd.services."friendica-worker" = {
+        path = [ php ];
+        script = "php bin/worker.php";
+        serviceConfig = {
+          Type = "oneshot";
+          User = cfg.user;
+          WorkingDirectory = "${friendicaRoot}";
+        };
+      };
+      systemd.timers."friendica-worker" = {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnActiveSec = "0";
+          OnUnitActiveSec = "600";
+          Unit = "friendica-worker.service";
+        };
+      };
+      services.mysql = {
+        enable = true;
+        package = pkgs.mariadb;
+        ensureDatabases = [ "friendica" ];
+        ensureUsers = [
+          {
+            name = cfg.user;
+            ensurePermissions = {
+              "friendica.*" = "ALL PRIVILEGES";
+            };
+          }
+        ];
+      };
+      warnings =
+        if config ? services.mail.sendmailSetuidWrapper.source
+        then []
+        else [ ''
+            Friendica tries to send mail with sendmail. User registration will be
+            pretty janky if you don't have one. I don't see a value for
+            services.mail.sendmailSetuidWrapper.source, which I think sendmail
+            providers usually set, but I'm not certain this is a reliable test.
+          '' ];
+    }
+  ]);
 }
