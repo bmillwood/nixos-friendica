@@ -1,15 +1,25 @@
 # friendica module for NixOS
 
-Hopefully the options should be relatively self-explanatory. I haven't used the
-resulting node much yet, so I'm not sure all functionality is there, but I've
-been able to post on it from my admin account.
+I don't recommend using this as-is, but you're welcome to read it for ideas or
+to see how I solved a particular problem. Hopefully it should be pretty
+well-commented.
 
-I suggest not using this module unless you can read and understand all of it,
-because I haven't necessarily written it to play nicely with other modules or a
-diversity of configurations. Suggestions welcome.
+Why not use it? Well, I've tested that I can post on it using my admin account,
+but I've not used it seriously "in anger", so I can't guarantee other
+functionality is there. More importantly, my experience is that it seems pretty
+easy to accidentally introduce security vulnerabilities into the deployment.
+I'm most concerned by the possibility of accidentally disclosing code or private
+data files (e.g. the config file) by getting the Apache config wrong, but I
+don't want to rule out other potential problems I could have introduced. The
+fact that the core Friendica code is in the Nix store and thus not writeable is
+helpful, but unfortunately there are things like the smarty3 cache that demand
+to be writeable by the server user.
 
-The current available configuration is using Apache and `mod_php`. I plan to
-offer at least a `php-fpm`-based configuration, and probably an nginx one.
+There are a few measures I could take to improve this situation, my favourite
+being insisting on use of php-fpm and a chroot environment so that running PHP
+processes can't access most of the filesystem. Also, if you feel qualified to
+review or pentest the code to the point where you feel comfortable with it, go
+right ahead. But I don't think I can endorse it in its current state.
 
 ## License
 
