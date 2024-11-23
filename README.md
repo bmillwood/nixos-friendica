@@ -1,5 +1,16 @@
 # friendica module for NixOS
 
+This NixOS module aims to set you up with a running friendica instance. It uses
+Apache as the webserver, but `php-fpm` rather than `mod_php` to run the PHP
+code. I used to make `mod_php` available as an option, but I removed it (in
+commit 8f66c33349097c1c5a2876baa5ad4e3da6a68591) because I couldn't tell you any
+circumstances under which `mod_php` was the better option. My only hesitation is
+that now the `.htaccess` logic that friendica is distributed with is no longer
+used, and instead I have my own code in the `RewriteRule` directives that
+hopefully covers the same use cases.
+
+---
+
 I don't recommend using this as-is, but you're welcome to read it for ideas or
 to see how I solved a particular problem. Hopefully it should be pretty
 well-commented.

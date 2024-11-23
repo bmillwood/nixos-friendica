@@ -1,5 +1,5 @@
 # lib stuff:
-{ fetchFromGitHub, stdenvNoCC
+{ stdenvNoCC
 # packages:
 , php, cacert, git, unzip
 # required arguments:
