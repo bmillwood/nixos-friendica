@@ -23,4 +23,21 @@ right ahead. But I don't think I can endorse it in its current state.
 
 ## License
 
-I'll pick one shortly. I realise the code is close to useless until I do.
+My intention is that this module be free for anyone to use, as long as they
+share any modifications they make. However, I'm confused about how licenses like
+the GPL and AGPL apply to infrastructure specifications like NixOS modules, e.g.
+whether using this module to host a Friendica instance would require someone to
+make available their changes to the module.
+
+See also: https://discourse.nixos.org/t/how-do-folks-think-about-licenses-for-nix-code-nixos-modules/56469
+
+For the time being, therefore, there's no explicit license grant. If you're
+accessing this repository through GitHub, you're granted certain rights e.g. to
+read and fork the repo under their terms of service:
+https://docs.github.com/en/site-policy/github-terms/github-terms-of-service#5-license-grant-to-other-users
+
+You can also (obviously) use this repo in any way that doesn't require
+permission from copyright owners, e.g. under fair use.
+
+Feel free to contact me (e.g. open an issue) to propose something else, if you
+have a use case for it.
