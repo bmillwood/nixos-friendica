@@ -64,7 +64,7 @@ let
     ?>
   '';
   # Some paths under the friendica root need to be writable by the server. This
-  # symlinks them to paths in the user home directory, which will be created by
+  # symlinks them to paths in cfg.stateDir, which will be created by
   # Apache's pre-start hook.
   friendicaRoot = pkgs.runCommand "friendica-root" {
       inherit addons friendica configFile;
@@ -90,6 +90,9 @@ let
       ln -s ${cfg.stateDir}/addon/"$a" $out/addon/"$a"
     done
   '';
+  # set it to a writable path if you want to modify the code after deployment
+  # (you'll have to copy it from friendicaRoot yourself in that case)
+  documentRoot = friendicaRoot;
 in
 {
   options = {
@@ -164,13 +167,13 @@ in
           enableACME = false;
           sslServerCert = "${cfg.sslDir}/${cfg.virtualHost}.crt";
           sslServerKey = "${cfg.sslDir}/${cfg.virtualHost}.key";
-          documentRoot = friendicaRoot;
+          inherit documentRoot;
           # adapted from friendica .htaccess-dist
           extraConfig = ''
             RewriteEngine on
             RewriteRule "(^|/)\.git" - [F]
-            RewriteCond ${friendicaRoot}/%{REQUEST_URI} !-f
-            RewriteRule "^(.*)$" unix:${config.services.phpfpm.pools.friendica.socket}|fcgi://127.0.0.1:9000${friendicaRoot}/index.php?pagename=$1 [E=REMOTE_USER:%{HTTP:Authorization},L,QSA,B,P]
+            RewriteCond ${documentRoot}/%{REQUEST_URI} !-f
+            RewriteRule "^(.*)$" unix:${config.services.phpfpm.pools.friendica.socket}|fcgi://127.0.0.1:9000${documentRoot}/index.php?pagename=$1 [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},L,QSA,B,P]
           '';
         };
       };
