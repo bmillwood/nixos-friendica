@@ -27,10 +27,12 @@ helpful, but unfortunately there are things like the smarty3 cache that demand
 to be writeable by the server user.
 
 There are a few measures I could take to improve this situation, my favourite
-being insisting on use of php-fpm and a chroot environment so that running PHP
-processes can't access most of the filesystem. Also, if you feel qualified to
-review or pentest the code to the point where you feel comfortable with it, go
-right ahead. But I don't think I can endorse it in its current state.
+being setting up php-fpm in a chroot environment so that running PHP processes
+can't access most of the filesystem.
+
+If you feel qualified to review or pentest the code to the point where you feel
+comfortable with it, go right ahead. But I don't think I can endorse it in its
+current state.
 
 ## License
 
