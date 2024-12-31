@@ -134,7 +134,11 @@ in
       addonsFromStateDir = mkOption {
         type = types.listOf types.str;
         default = [];
-        description = "Addons that will be in the state directory.";
+        description = ''
+          Addons to be read from the state directory. If set, the webserver user
+          will be added to `cfg.group` and the permissions of `cfg.stateDir`
+          will be set to allow access.
+        '';
       };
     };
   };
@@ -170,10 +174,15 @@ in
           inherit documentRoot;
           # adapted from friendica .htaccess-dist
           extraConfig = ''
+            <Directory "${cfg.stateDir}">
+              Options FollowSymLinks
+              AllowOverride None
+              Require all granted
+            </Directory>
             RewriteEngine on
             RewriteRule "(^|/)\.git" - [F]
-            RewriteCond ${documentRoot}/%{REQUEST_URI} !-f
-            RewriteRule "^(.*)$" unix:${config.services.phpfpm.pools.friendica.socket}|fcgi://127.0.0.1:9000${documentRoot}/index.php?pagename=$1 [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},L,QSA,B,P]
+            RewriteCond "${documentRoot}/%{REQUEST_URI}" !-f
+            RewriteRule "^([^.]*(\.pcss)?)$" unix:${config.services.phpfpm.pools.friendica.socket}|fcgi://127.0.0.1:9000${documentRoot}/index.php?pagename=$1 [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},L,QSA,B,P]
           '';
         };
       };
@@ -185,13 +194,26 @@ in
         # not sure if this matters
         useDefaultShell = true;
       };
-      users.groups.${cfg.group} = {};
-      systemd.services."friendica-setup" = {
+      users.groups.${cfg.group} = {
+        members =
+          lib.optional
+            (cfg.addonsFromStateDir != [])
+            config.services.httpd.user;
+      };
+      systemd.services."friendica-setup" =
+        let
+          grantHttpdAccessToAddon =
+            lib.optionalString (cfg.addonsFromStateDir != []) ''
+              chmod g+x ~
+              chmod -R g+rX ~/addon
+            '';
+        in {
         # friendica uses shell_exec('which ' . $phppath)
         path = [ pkgs.bash php pkgs.which ];
         script = ''
-          [ -d ~/log ] || mkdir -p ~/log
-          [ -d ~/view/smarty3 ] || mkdir -p ~/view/smarty3
+          ${grantHttpdAccessToAddon}
+          [ -d ~/log ] || mkdir -m 700 -p ~/log
+          [ -d ~/view/smarty3 ] || mkdir -m 700 -p ~/view/smarty3
           if [ -z "$(echo "SHOW TABLES" | ${config.services.mysql.package}/bin/mysql friendica)" ]
           then
             cd ${friendicaRoot}
