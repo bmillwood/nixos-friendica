@@ -172,8 +172,15 @@ in
           sslServerCert = "${cfg.sslDir}/${cfg.virtualHost}.crt";
           sslServerKey = "${cfg.sslDir}/${cfg.virtualHost}.key";
           inherit documentRoot;
-          # adapted from friendica .htaccess-dist
-          extraConfig = ''
+          extraConfig = let
+              # This is annoying to get right. We want static media to be served
+              # by Apache, and other stuff to be forwarded to Friendica.
+              # We characterise static media as "has a file extension, except
+              # for .pcss", and a file extension means a dot in the last path
+              # component. (Just matching a dot anywhere doesn't work because
+              # stuff under .well-known/ is handled by Friendica).
+              toProxy = "^((?:.*/)*[^.]*(?:\.pcss)?)$";
+            in ''
             <Directory "${cfg.stateDir}">
               Options FollowSymLinks
               AllowOverride None
@@ -182,7 +189,7 @@ in
             RewriteEngine on
             RewriteRule "(^|/)\.git" - [F]
             RewriteCond "${documentRoot}/%{REQUEST_URI}" !-f
-            RewriteRule "^([^.]*(\.pcss)?)$" unix:${config.services.phpfpm.pools.friendica.socket}|fcgi://127.0.0.1:9000${documentRoot}/index.php?pagename=$1 [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},L,QSA,B,P]
+            RewriteRule "${toProxy}" unix:${config.services.phpfpm.pools.friendica.socket}|fcgi://127.0.0.1:9000${documentRoot}/index.php?pagename=$1 [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},L,QSA,B,P]
           '';
         };
       };
