@@ -104,7 +104,7 @@ in
       };
       sslDir = mkOption {
         type = types.str;
-        description = "Where to find SSL certificates. Expects $sslDir/$virtualHost.crt and $sslDir/$virtualHost.key to be readable by $user.";
+        description = "Where to find SSL certificates. Expects $sslDir/$virtualHost.crt and $sslDir/$virtualHost.key to be readable by the web server.";
       };
       user = mkOption {
         type = types.str;
