@@ -24,16 +24,16 @@ let
       "display_errors = Off;"
     ];
   };
-  version = "2024.08";
+  version = "2024.12";
   addons = pkgs.fetchFromGitHub {
     owner = "friendica";
     repo = "friendica-addons";
     rev = version;
-    hash = "sha256-h/WQUngIUEdTnpErWeoFHiJR+fuBBI8z57hY6P78fHE=";
+    hash = "sha256-nv1BRuFK99QEN/2gTfUIlTKvHP5Dulio1Ct6bH9PkZ8=";
   };
   friendica = pkgs.callPackage ./friendica-src-with-deps.nix {
     inherit php version;
-    outputHash = "sha256-Qb79rS1+aNniwlxlYfWYW6uuf69ETxrgqtb6ErF07y0=";
+    outputHash = "sha256-5j2ZV5CNpOPc29q2BwWTGfIMOmnHNa706wrsi9b6ovQ=";
   };
   configFile = pkgs.writeText "local.config.php" ''
     <?php
