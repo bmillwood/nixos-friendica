@@ -241,6 +241,7 @@ in
           User = cfg.user;
           WorkingDirectory = "${friendicaRoot}";
         };
+        wants = [ "friendica-setup.service" ];
       };
       systemd.timers."friendica-worker" = {
         wantedBy = [ "timers.target" ];
